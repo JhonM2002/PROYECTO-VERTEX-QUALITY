@@ -188,6 +188,17 @@ body {
   outline: none;
   box-shadow: 0 0 10px rgba(93, 173, 226, 0.2);
 }
+.input-correct {
+  border-color: #28a745;
+  background-color: #e8f5e9;
+  cursor: not-allowed;
+}
+
+.input-incorrect {
+  border-color: #dc3545;
+  background-color: #f8d7da;
+}
+
 
 /* Botones */
 .btn {

@@ -7,11 +7,10 @@ import { Router } from '@angular/router';
   styleUrls: ['./game.component.css']
 })
 export class GameComponent implements OnInit {
-  patientName: string = ''; 
+  patientName: string = '';
   sequence: any[] = [];
   missingNumbers: number[] = [];
-  missingIndices: number[] = [];
-  userInputs: number[] = [];
+  userInputs: { value: number | null; correct: boolean; disabled: boolean }[] = [];
   errors: number = 0; // Contador de errores totales
   correctCount: number = 0; // Contador de aciertos
   feedbackMessage: string = '';
@@ -31,7 +30,7 @@ export class GameComponent implements OnInit {
     this.patientName = localStorage.getItem('patientName') || 'Paciente'; // Obtener el nombre del paciente
     this.setupGame();
   }
-// Lógica para el botón "Comprobar"
+
   setupGame(): void {
     this.rangeStart = parseInt(localStorage.getItem('rangeStart') || '0', 10);
     this.rangeEnd = parseInt(localStorage.getItem('rangeEnd') || '0', 10);
@@ -44,20 +43,28 @@ export class GameComponent implements OnInit {
     this.actualRangeStart = this.sequence[0];
     this.actualRangeEnd = this.sequence[this.sequence.length - 1];
 
-    this.missingIndices = [];
-    while (this.missingIndices.length < this.missingCount) {
+    const missingIndices: number[] = [];
+    while (missingIndices.length < this.missingCount) {
       const randomIndex = Math.floor(Math.random() * this.sequence.length);
-      if (!this.missingIndices.includes(randomIndex)) {
-        this.missingIndices.push(randomIndex);
+      if (!missingIndices.includes(randomIndex)) {
+        missingIndices.push(randomIndex);
       }
     }
 
-    this.missingNumbers = this.missingIndices.map(index => this.sequence[index]);
-    this.missingIndices.forEach(index => {
+    this.missingNumbers = missingIndices.map(index => this.sequence[index]);
+    missingIndices.forEach(index => {
       this.sequence[index] = '';
     });
 
+    // Mezclar la secuencia desordenada
     this.shuffleArray(this.sequence);
+
+    this.userInputs = Array.from({ length: this.missingCount }, () => ({
+      value: null,
+      correct: false,
+      disabled: false
+    }));
+
     this.startTime = new Date();
   }
 
@@ -67,30 +74,43 @@ export class GameComponent implements OnInit {
       [array[i], array[j]] = [array[j], array[i]];
     }
   }
-// Lógica para el botón "Comprobar"
-  validateInput(): void {
-    const userInputArray = Array.from(new Set(this.userInputs.filter(input => !isNaN(input))));
-    const isCorrect = userInputArray.length === this.missingNumbers.length &&
-                      userInputArray.every(num => this.missingNumbers.includes(num));
 
-    if (isCorrect) {
-      this.correctCount = this.missingNumbers.length;
-      this.feedbackMessage = "¡Correcto!";
+  validateInputs(): void {
+    let errorCount = 0; // Contador de errores en esta validación
+
+    this.userInputs.forEach((input, index) => {
+      if (!input.correct) { // Solo evaluar los que no han sido marcados como correctos
+        if (this.missingNumbers.includes(input.value!)) {
+          input.correct = true;
+          input.disabled = true;
+          this.correctCount++; // Incrementar solo la primera vez que se valida correctamente
+        } else {
+          input.correct = false;
+          errorCount++;
+        }
+      }
+    });
+
+    this.errors += errorCount; // Actualizar el contador de errores global
+
+    const allCorrect = this.userInputs.every(input => input.correct);
+
+    if (allCorrect) {
+      this.feedbackMessage = '¡Correcto! Todos los números son válidos.';
       this.feedbackClass = 'success';
       this.saveHistoryAndProceed();
     } else {
-      this.errors++;
-      this.feedbackMessage = "¡Incorrecto! Intenta de nuevo.";
+      this.feedbackMessage = '¡Algunos números son incorrectos o están vacíos! Intenta corregirlos.';
       this.feedbackClass = 'error';
       this.updateMotivationalMessage();
-      setTimeout(() => {
-        this.feedbackMessage = '';
-        this.feedbackClass = '';
-      }, 3000);
     }
+
+    setTimeout(() => {
+      this.feedbackMessage = '';
+      this.feedbackClass = '';
+    }, 3000);
   }
 
-  // Nueva lógica para el botón "Terminar Intento"
   endAttempt(): void {
     const timeTaken = (new Date().getTime() - this.startTime.getTime()) / 1000;
     localStorage.setItem('timeTaken', timeTaken.toString());
@@ -101,7 +121,6 @@ export class GameComponent implements OnInit {
     this.router.navigate(['/result']);
   }
 
-  // Nueva lógica para el botón "Terminar Juego"
   saveHistoryAndProceed(): void {
     const timeTaken = (new Date().getTime() - this.startTime.getTime()) / 1000;
     localStorage.setItem('timeTaken', timeTaken.toString());
@@ -111,7 +130,7 @@ export class GameComponent implements OnInit {
     localStorage.setItem('gameStatus', 'complete'); // Marcar como completo
     this.router.navigate(['/result']);
   }
-// Mensajes motivacionales para el usuario
+
   updateMotivationalMessage(): void {
     const messages = [
       '¡Sigue adelante, estás muy cerca!',
